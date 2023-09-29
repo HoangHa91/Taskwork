@@ -9,11 +9,6 @@ services:
     volumes:
       - ./data:/opt/data
 
-  test:
-    image: etl 
-    volumes:
-      - ./data:/opt/data
-
   postgres:
     image: postgres:15
     environment:
