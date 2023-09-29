@@ -10,8 +10,6 @@ try:
   assert df['top_workspace'].values[0] == '5bfd08d8326bcf0009a10cb5'
   assert df['longest_streak'].values[0] == 3
   
-  # Add more assertions on data
-  
   print("Integration test passed!")
   
 except psycopg2.Error as e:
