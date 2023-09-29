@@ -1,6 +1,22 @@
 version: '3.9'
+
 services:
+
   etl:
-    # TODO: Add your ETL Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/opt/data
+
   postgres:
-    # TODO: Add PostgreSQL 15
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=warehouse
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
