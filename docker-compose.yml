@@ -9,11 +9,16 @@ services:
     volumes:
       - ./data:/opt/data
 
+  test:
+    image: etl 
+    volumes:
+      - ./data:/opt/data
+
   postgres:
     image: postgres:15
     environment:
       - POSTGRES_DB=warehouse
-      - POSTGRES_USER=postgres
+      - POSTGRES_USER=postgres  
       - POSTGRES_PASSWORD=postgres
     volumes:
       - pgdata:/var/lib/postgresql/data
