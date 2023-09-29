@@ -1,0 +1,6 @@
+version: '3.9'
+services:
+  etl:
+    # TODO: Add your ETL Dockerfile
+  postgres:
+    # TODO: Add PostgreSQL 15
