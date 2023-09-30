@@ -1,0 +1,144 @@
+diff --git a/Dockerfile b/Dockerfile
+new file mode 100644
+index 0000000..dfdc0b7
+--- /dev/null
++++ b/Dockerfile
+@@ -0,0 +1,10 @@
++FROM python:3
++
++WORKDIR /app
++
++COPY requirements.txt ./
++RUN pip install -r requirements.txt
++
++COPY . .
++
++CMD [ "python", "main.py" ]
+\ No newline at end of file
+diff --git a/docker-compose.yml b/docker-compose.yml
+index be80711..5247409 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -1,6 +1,22 @@
+ version: '3.9'
++
+ services:
++
+   etl:
+-    # TODO: Add your ETL Dockerfile
++    build: 
++      context: .
++      dockerfile: Dockerfile
++    volumes:
++      - ./data:/opt/data
++
+   postgres:
+-    # TODO: Add PostgreSQL 15
++    image: postgres:15
++    environment:
++      - POSTGRES_DB=warehouse
++      - POSTGRES_USER=postgres  
++      - POSTGRES_PASSWORD=postgres
++    volumes:
++      - pgdata:/var/lib/postgresql/data
++
++volumes:
++  pgdata:
+\ No newline at end of file
+diff --git a/main.py b/main.py
+index cb57d17..ca894d9 100644
+--- a/main.py
++++ b/main.py
+@@ -6,9 +6,54 @@ docker-compose run etl python main.py \
+     --database warehouse
+     --table user_activity
+ """
+-
+ # TODO: Implement a pipeline that loads the provided activity.csv file, performs the required
+ # transformations, and loads the result into the PostgreSQL table.
+ 
+ # Note: You can write the ETL flow with regular Python code, or you can also make use of a
+ # framework such as PySpark or others. The choice is yours.
++
++import psycopg2
++import pandas as pd
++from argparse import ArgumentParser
++
++def get_args():
++  parser = ArgumentParser()
++  parser.add_argument('--source')
++  parser.add_argument('--database')
++  parser.add_argument('--table')
++  return parser.parse_args()
++
++def extract_data(filepath):
++  return pd.read_csv(filepath)
++
++def transform_data(df):
++  df = df.groupby('user_id').agg({
++    'workspace_id': 'last', 
++    'total_activity': 'sum'
++  }).reset_index()
++  
++  df['longest_streak'] = (df['date'] 
++                          .groupby(df['user_id'])
++                          .apply(lambda x: (x!=x.shift()).cumsum())
++                          .groupby(df['user_id']).max())
++
++  return df  
++
++def load_data(df, db, table):
++  conn = psycopg2.connect(database=db, user='postgres', password='postgres', host='db')
++  cursor = conn.cursor()
++
++  columns = ','.join(df.columns)
++  values = "VALUES({})".format(",".join(["%s" for _ in df.columns])) 
++  insert_stmt = f"INSERT INTO {table} ({columns}) {values}"
++
++  cursor.executemany(insert_stmt, df.values.tolist())
++  conn.commit()
++
++  conn.close()
++
++if __name__ == "__main__":
++  args = get_args()
++  df = extract_data(args.source)
++  df = transform_data(df) 
++  load_data(df, args.database, args.table)
+\ No newline at end of file
+diff --git a/requirements.txt b/requirements.txt
+new file mode 100644
+index 0000000..a4568f9
+--- /dev/null
++++ b/requirements.txt
+@@ -0,0 +1,2 @@
++pandas==2.1.1
++psycopg2-binary==2.9.8
+\ No newline at end of file
+diff --git a/test_etl.py b/test_etl.py
+new file mode 100644
+index 0000000..ff9efca
+--- /dev/null
++++ b/test_etl.py
+@@ -0,0 +1,20 @@
++import psycopg2
++import pandas as pd
++USER_ID = '5bfd0e8d472bcf0009a1014d'
++
++try:
++  conn = psycopg2.connect(host="postgres", dbname="warehouse", user="postgres", password="postgres")
++  
++  df = pd.read_sql(f'SELECT * FROM user_activity WHERE user_id=\'{USER_ID}\'', conn)
++
++  assert df['top_workspace'].values[0] == '5bfd08d8326bcf0009a10cb5'
++  assert df['longest_streak'].values[0] == 3
++  
++  print("Integration test passed!")
++  
++except psycopg2.Error as e:
++  print("Connection error:")
++  print(e)
++  
++finally:
++  conn.close()
+\ No newline at end of file
